@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Return Form</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        /* Basic styling */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        .form-container {
+            max-width: 600px;
+            margin: auto;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+        .hidden {
+            display: none;
+        }
+        .submit-btn {
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .submit-btn:hover {
+            background-color: #0056b3;
+        }
+        .error-message {
+            color: #dc3545;
+            margin-top: 10px;
+        }
+        .success-message {
+            color: #28a745;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h2>Product Return Form</h2>
+        <div class="form-group">
+            <label for="serial-number">Serial Number:</label>
+            <input type="text" id="serial-number" name="serial-number" required>
+        </div>
+        <div class="form-group">
+            <label for="title">Title:</label>
+            <input type="text" id="title" name="title" readonly>
+        </div>
+        <div class="form-group">
+            <label for="erp-number">ERP Number:</label>
+            <input type="text" id="erp-number" name="erp-number" readonly>
+        </div>
+        <div class="form-group">
+            <label for="created-date">Created Date:</label>
+            <input type="text" id="created-date" name="created-date" readonly>
+        </div>
+        <div class="form-group">
+            <label for="author">Author:</label>
+            <input type="text" id="author" name="author" readonly>
+        </div>
+        <div class="form-group">
+            <label for="return-reason">Return Reason:</label>
+            <select id="return-reason" name="return-reason">
+                <option value="">Select a reason</option>
+                <option value="defective">Defective</option>
+                <option value="wrong-item">Wrong Item</option>
+                <option value="no-longer-needed">No Longer Needed</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="additional-info">Additional Information:</label>
+            <input type="text" id="additional-info" name="additional-info">
+        </div>
+        <button type="button" class="submit-btn" id="submit-btn">Submit</button>
+        <div id="message" class="hidden"></div>
+    </div>
+
+    <script>
+        const API_ENDPOINT = 'https://prod-248.westeurope.logic.azure.com:443/workflows/44d1310bf2da49099fcba64a5aacdb90/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=LWf0NN2QHi0kzzLN5fl457tzUPhJGWA_awk9MeHgLuA';
+
+        const serialNumberInput = document.getElementById('serial-number');
+        const titleInput = document.getElementById('title');
+        const erpNumberInput = document.getElementById('erp-number');
+        const createdDateInput = document.getElementById('created-date');
+        const authorInput = document.getElementById('author');
+        const returnReasonSelect = document.getElementById('return-reason');
+        const additionalInfoInput = document.getElementById('additional-info');
+        const submitBtn = document.getElementById('submit-btn');
+        const messageDiv = document.getElementById('message');
+
+        function showMessage(message, isError = false) {
+            messageDiv.textContent = message;
+            messageDiv.className = isError ? 'error-message' : 'success-message';
+            messageDiv.classList.remove('hidden');
+        }
+
+        function hideMessage() {
+            messageDiv.classList.add('hidden');
+            messageDiv.textContent = '';
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleString();
+        }
+
+        serialNumberInput.addEventListener('change', async function() {
+            const serialNumber = this.value.trim();
+            hideMessage();
+
+            if (serialNumber) {
+                try {
+                    const response = await axios.post(API_ENDPOINT, { serialNumber });
+                    
+                    if (response.status === 200 && response.data.length > 0) {
+                        const data = response.data[0];
+                        
+                        titleInput.value = data.Title || '';
+                        erpNumberInput.value = data.OData__x05de__x05e1__x05e4__x05e8_ERP || '';
+                        createdDateInput.value = formatDate(data.Created);
+                        authorInput.value = data.Author.DisplayName || '';
+
+                        // Enable form fields
+                        returnReasonSelect.disabled = false;
+                        additionalInfoInput.disabled = false;
+                        submitBtn.disabled = false;
+                    } else {
+                        showMessage('No data found for this serial number.', true);
+                    }
+                } catch (error) {
+                    console.error('Error fetching data:', error);
+                    showMessage('Error retrieving product data. Please try again.', true);
+                }
+            } else {
+                // Clear and disable form fields
+                titleInput.value = '';
+                erpNumberInput.value = '';
+                createdDateInput.value = '';
+                authorInput.value = '';
+                returnReasonSelect.value = '';
+                additionalInfoInput.value = '';
+                
+                returnReasonSelect.disabled = true;
+                additionalInfoInput.disabled = true;
+                submitBtn.disabled = true;
+            }
+        });
+
+        submitBtn.addEventListener('click', async function() {
+            hideMessage();
+
+            const serialNumber = serialNumberInput.value.trim();
+            const returnReason = returnReasonSelect.value;
+            const additionalInfo = additionalInfoInput.value.trim();
+
+            if (!serialNumber || !returnReason) {
+                showMessage('Please fill in all required fields.', true);
+                return;
+            }
+
+            const formData = {
+                serialNumber,
+                returnReason,
+                additionalInfo,
+                title: titleInput.value,
+                erpNumber: erpNumberInput.value,
+                createdDate: createdDateInput.value,
+                author: authorInput.value
+            };
+
+            try {
+                const response = await axios.post(API_ENDPOINT, formData);
+                if (response.status === 200) {
+                    showMessage('Return submitted successfully!');
+                    // Optionally reset the form here
+                } else {
+                    throw new Error('Unexpected response status');
+                }
+            } catch (error) {
+                console.error('Error submitting form:', error);
+                showMessage('There was an error submitting the return. Please try again.', true);
+            }
+        });
+    </script>
+</body>
+</html>
